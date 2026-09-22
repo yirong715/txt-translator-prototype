@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>原型 / 需求说明 查看器</title>
+<!--
+  本文件由 prototype-spec-annotator 技能生成。
+  原始原型页面通过 iframe 嵌入,本文件不做任何修改。
+  生成时会替换以下两个占位符:
+    __SPEC_PATH__       → 对应 .md 说明文件的相对路径(如 app-management.md)
+    __PROTOTYPE_PATH__  → 原型页面相对路径或 dev server URL(如 app-management.html 或 http://localhost:5173/...)
+  必须通过 scripts/spec_server.py 提供的本地 HTTP 服务访问,否则 fetch / iframe 在 file:// 下会失败。
+-->
+<script>
+  // ===== 生成时注入的参数 =====
+  const SPEC_PATH = "/txt_trastor/text_translation.md";
+  const PROTOTYPE_PATH = "/txt_trastor/text_translation.html";
+  const SAVE_ENDPOINT = "/save";
+</script>
+<script src="/vendor/marked.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  #topbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; background: #1f2937; color: #fff;
+    border-bottom: 1px solid #111827; flex-wrap: wrap;
+  }
+  #topbar button {
+    padding: 6px 14px; border: none; border-radius: 4px;
+    background: #4b5563; color: #fff; cursor: pointer; font-size: 14px;
+  }
+  #topbar button:hover { background: #6b7280; }
+  #topbar button.active { background: #2563eb; }
+  #topbar .title { font-weight: 600; margin-right: 12px; font-size: 14px; opacity: .9; }
+  #status { margin-left: auto; font-size: 13px; color: #9ca3af; }
+  #status.success { color: #34d399; }
+  #status.error { color: #f87171; }
+  #status.saving { color: #fbbf24; }
+  #content { height: calc(100vh - 45px); }
+  #prototype-frame { width: 100%; height: 100%; border: none; display: block; background: #fff; }
+  #spec-view {
+    height: 100%; overflow: auto; padding: 32px 48px;
+    background: #fff; line-height: 1.7; color: #1f2937;
+  }
+  #spec-view h1 { font-size: 24px; margin: 0 0 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+  #spec-view h2 { font-size: 20px; margin: 24px 0 12px; color: #111827; }
+  #spec-view h3 { font-size: 16px; margin: 20px 0 8px; color: #374151; }
+  #spec-view table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  #spec-view th, #spec-view td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; vertical-align: top; }
+  #spec-view th { background: #f3f4f6; font-weight: 600; }
+  #spec-view tr:nth-child(even) { background: #fafafa; }
+  #spec-view code { background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  #spec-view blockquote { border-left: 4px solid #60a5fa; padding: 8px 16px; margin: 12px 0; background: #eff6ff; color: #1e40af; }
+  #spec-view ul, #spec-view ol { padding-left: 24px; margin: 8px 0; }
+  #spec-view li { margin: 4px 0; }
+  #edit-view { height: 100%; display: flex; flex-direction: column; background: #fff; }
+  #edit-view .edit-toolbar { padding: 8px 16px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; display: flex; gap: 8px; }
+  #edit-view .edit-toolbar button { padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  #btn-save { background: #2563eb; color: #fff; }
+  #btn-save:hover { background: #1d4ed8; }
+  #btn-cancel-edit { background: #e5e7eb; color: #374151; }
+  #btn-cancel-edit:hover { background: #d1d5db; }
+  #editor { flex: 1; width: 100%; border: none; outline: none; padding: 16px 24px;
+            font-family: "Cascadia Code", "Consolas", "Microsoft YaHei", monospace;
+            font-size: 14px; line-height: 1.6; resize: none; }
+  .hidden { display: none !important; }
+  #loading { padding: 40px; text-align: center; color: #6b7280; font-size: 15px; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <span class="title">📋 原型说明查看器</span>
+  <button id="btn-prototype">🖥️ 原型页面</button>
+  <button id="btn-spec">📄 需求说明</button>
+  <button id="btn-edit">✏️ 编辑</button>
+  <span id="status"></span>
+</div>
+<div id="content">
+  <iframe id="prototype-frame" class="hidden"></iframe>
+  <div id="spec-view" class="hidden"><div id="loading">正在加载需求说明…</div></div>
+  <div id="edit-view" class="hidden">
+    <div class="edit-toolbar">
+      <button id="btn-save">💾 保存(写入前自动备份旧版)</button>
+      <button id="btn-cancel-edit">取消</button>
+    </div>
+    <textarea id="editor" placeholder="在此编辑 Markdown 说明…"></textarea>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+  var specMd = "";
+  var iframe = document.getElementById("prototype-frame");
+  var specView = document.getElementById("spec-view");
+  var editView = document.getElementById("edit-view");
+  var editor = document.getElementById("editor");
+  var statusEl = document.getElementById("status");
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.className = kind || "";
+  }
+
+  function showOnly(id) {
+    iframe.classList.add("hidden");
+    specView.classList.add("hidden");
+    editView.classList.add("hidden");
+    document.getElementById(id).classList.remove("hidden");
+    // 顶栏高亮
+    document.getElementById("btn-prototype").classList.remove("active");
+    document.getElementById("btn-spec").classList.remove("active");
+    if (id === "prototype-frame") document.getElementById("btn-prototype").classList.add("active");
+    if (id === "spec-view") document.getElementById("btn-spec").classList.add("active");
+  }
+
+  function renderSpec(md) {
+    if (typeof marked === "undefined") {
+      specView.innerHTML = '<div style="color:#dc2626;padding:24px;">⚠️ Markdown 渲染器(marked.min.js)加载失败。请确认本地服务已启动且 /vendor/marked.min.js 可访问。</div>';
+      return;
+    }
+    try {
+      specView.innerHTML = marked.parse(md);
+    } catch (e) {
+      specView.innerHTML = '<pre style="padding:24px;">' + escapeHtml(md) + '</pre>';
+    }
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function loadSpec() {
+    setStatus("加载说明中…", "saving");
+    fetch(SPEC_PATH, { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      })
+      .then(function (md) {
+        specMd = md;
+        renderSpec(md);
+        setStatus("说明已加载", "success");
+        setTimeout(function () { setStatus("", ""); }, 2000);
+      })
+      .catch(function (err) {
+        specView.innerHTML = '<div style="color:#dc2626;padding:32px;line-height:1.8;">' +
+          '<h3 style="margin-bottom:12px;">⚠️ 无法加载需求说明</h3>' +
+          '<p>可能原因:</p>' +
+          '<ul style="margin:8px 0 8px 24px;">' +
+            '<li>本地服务未启动 —— 请运行:<code>python spec_server.py --root &lt;项目根&gt;</code></li>' +
+            '<li>说明文件路径不对 —— SPEC_PATH = <code>' + escapeHtml(SPEC_PATH) + '</code></li>' +
+            '<li>文件不存在 —— 尚未生成该页面的 .md 说明</li>' +
+          '</ul>' +
+          '<p style="margin-top:12px;">错误详情:<code>' + escapeHtml(String(err)) + '</code></p>' +
+          '</div>';
+        setStatus("加载失败", "error");
+      });
+  }
+
+  function saveSpec() {
+    var content = editor.value;
+    setStatus("保存中(写入前备份旧版)…", "saving");
+    fetch(SAVE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: SPEC_PATH, content: content })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.success) {
+          specMd = content;
+          renderSpec(content);
+          showOnly("spec-view");
+          var msg = "已保存";
+          if (res.backup) msg += "(旧版已备份: " + res.backup + ")";
+          setStatus(msg, "success");
+        } else {
+          setStatus("保存失败: " + (res.error || "未知错误"), "error");
+        }
+      })
+      .catch(function (err) {
+        setStatus("保存失败:请确认本地服务已启动(" + err + ")", "error");
+      });
+  }
+
+  // ===== 事件绑定 =====
+  document.getElementById("btn-prototype").addEventListener("click", function () {
+    if (!iframe.src) iframe.src = PROTOTYPE_PATH;
+    showOnly("prototype-frame");
+    setStatus("", "");
+  });
+  document.getElementById("btn-spec").addEventListener("click", function () {
+    showOnly("spec-view");
+    setStatus("", "");
+  });
+  document.getElementById("btn-edit").addEventListener("click", function () {
+    editor.value = specMd;
+    showOnly("edit-view");
+    editor.focus();
+    setStatus("", "");
+  });
+  document.getElementById("btn-save").addEventListener("click", saveSpec);
+  document.getElementById("btn-cancel-edit").addEventListener("click", function () {
+    showOnly("spec-view");
+    setStatus("", "");
+  });
+  // Ctrl+S 保存
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s" && !editView.classList.contains("hidden")) {
+      e.preventDefault();
+      saveSpec();
+    }
+  });
+
+  // ===== 初始化:默认显示说明视图并加载 =====
+  showOnly("spec-view");
+  loadSpec();
+})();
+</script>
+</body>
+</html>

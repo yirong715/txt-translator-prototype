@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="zh" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Hub · 机器翻译</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============ DESIGN TOKENS (from DESIGN.md) ============ */
+  :root {
+    --primary: #6366f1;
+    --accent: #06b6d4;
+    --purple: #a855f7;
+    --on-primary: #ffffff;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+
+    --radius-panel: 36px;
+    --radius-card: 32px;
+    --radius-button: 12px;
+    --radius-scene: 8px;
+
+    --font-display: "Inter", sans-serif;
+    --font-body: "Plus Jakarta Sans", sans-serif;
+
+    --transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Dark theme (baseline) */
+  .dark {
+    --canvas: #0a0a0f;
+    --body-text: #ffffff;
+    --secondary-text: #94a3b8;
+    --emphasis-text: #f1f5f9;
+    --glass-nav: rgba(255,255,255,0.05);
+    --glass-card: rgba(255,255,255,0.03);
+    --glass-card-border: rgba(255,255,255,0.06);
+    --glass-card-border-top: rgba(255,255,255,0.12);
+    --panel-bg: rgba(255,255,255,0.015);
+    --panel-border: rgba(255,255,255,0.05);
+    --input-box-bg: rgba(255,255,255,0.04);
+    --canvas-glow-1: rgba(99,102,241,0.15);
+    --canvas-glow-2: rgba(6,182,212,0.15);
+    --canvas-glow-3: rgba(168,85,247,0.12);
+    --dot-color: rgba(255,255,255,0.15);
+    --star-color: rgba(255,255,255,0.6);
+    --shadow-card: 0 24px 48px -12px rgba(0,0,0,0.5), 0 0 40px -8px rgba(99,102,241,0.2);
+  }
+
+  /* Light theme */
+  .light {
+    --canvas: linear-gradient(180deg, #eaf2ff, #e0eaf7, #dbe6f5);
+    --body-text: #1e293b;
+    --secondary-text: #64748b;
+    --emphasis-text: #1e293b;
+    --glass-nav: rgba(255,255,255,0.3);
+    --glass-card: rgba(255,255,255,0.4);
+    --glass-card-border: rgba(255,255,255,0.6);
+    --glass-card-border-top: rgba(255,255,255,0.75);
+    --panel-bg: rgba(255,255,255,0.18);
+    --panel-border: rgba(255,255,255,0.45);
+    --input-box-bg: rgba(255,255,255,0.5);
+    --canvas-glow-1: rgba(99,102,241,0.18);
+    --canvas-glow-2: rgba(6,182,212,0.18);
+    --canvas-glow-3: rgba(168,85,247,0.14);
+    --dot-color: rgba(99,102,241,0.18);
+    --star-color: rgba(99,102,241,0.4);
+    --shadow-card: 0 24px 48px -12px rgba(99,102,241,0.2);
+  }
+
+  /* ============ BASE ============ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-body);
+    background: var(--canvas);
+    color: var(--body-text);
+    transition: background var(--transition), color var(--transition);
+    min-height: 1024px;
+    position: relative;
+  }
+
+  /* ============ 7-LAYER ATMOSPHERIC BACKGROUND (absolute within .page, matches pen coords) ============ */
+  .bg-layer { position: absolute; top: 0; left: 0; width: 1920px; height: 1024px; pointer-events: none; z-index: 0; }
+
+  .ambient-bg {
+    background:
+      radial-gradient(900px 900px at -10% -10%, var(--canvas-glow-1), transparent 60%),
+      radial-gradient(1000px 1000px at 1220px 520px, var(--canvas-glow-2), transparent 60%);
+  }
+  .mesh-blobs .blob {
+    position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.55;
+  }
+  .blob-1 { width: 520px; height: 520px; left: 80px; top: 120px; background: var(--primary); opacity: 0.18; }
+  .blob-2 { width: 560px; height: 560px; left: 1300px; top: 480px; background: var(--accent); opacity: 0.16; }
+  .blob-3 { width: 420px; height: 420px; left: 600px; top: 60px; background: var(--purple); opacity: 0.14; }
+
+  .dot-grid {
+    background-image: radial-gradient(var(--dot-color) 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.35;
+  }
+  .center-glow {
+    background: radial-gradient(ellipse 1100px 560px at 960px 570px, var(--canvas-glow-1), transparent 70%);
+    filter: blur(80px); opacity: 0.5;
+  }
+  .stars .star {
+    position: absolute; width: 3px; height: 3px; border-radius: 50%;
+    background: var(--star-color); opacity: 0.6;
+    animation: twinkle 4s ease-in-out infinite;
+  }
+  @keyframes twinkle { 0%,100% { opacity: 0.2; } 50% { opacity: 0.8; } }
+
+  /* ============ LAYOUT (fixed 1920 canvas, matches pen prototype) ============ */
+  .page { position: relative; z-index: 10; width: 1920px; min-height: 1024px; margin: 0 auto; display: flex; flex-direction: column; }
+
+  /* ============ TOP NAV ============ */
+  .glass-nav {
+    position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 1920px; height: 72px; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px;
+    background: var(--glass-nav);
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    border-bottom: 1px solid var(--glass-card-border);
+    direction: ltr;
+  }
+  .logo-group { display: flex; align-items: center; gap: 10px; }
+  .logo-mark {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; box-shadow: 0 8px 20px -6px rgba(99,102,241,0.5);
+  }
+  .wordmark { font-size: 20px; font-weight: 800; color: var(--body-text); }
+  .wordmark .gradient {
+    background: linear-gradient(90deg, var(--primary), var(--accent), var(--purple), var(--primary));
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: gradient-pan 10s linear infinite;
+  }
+  @keyframes gradient-pan { to { background-position: 300% 0; } }
+
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: var(--radius-button);
+    background: var(--glass-card); border: 1px solid var(--glass-card-border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--secondary-text); cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+  }
+  .icon-btn:hover { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.3); color: var(--primary); transform: translateY(-1px); }
+  .lang-btn {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border-radius: var(--radius-button); background: var(--glass-card);
+    border: 1px solid var(--glass-card-border); cursor: pointer;
+    color: var(--body-text); font-size: 13px; font-weight: 600;
+    transition: all 0.2s;
+  }
+  .lang-btn:hover { background: rgba(99,102,241,0.12); }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 14px; font-weight: 800; cursor: pointer;
+  }
+
+  /* ============ PAGE HEADER (pen: 1344 wide @ x:288 y:72) ============ */
+  .page-header { width: 1344px; height: 142px; margin: 72px 288px 0; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
+  .scene-label {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--accent);
+    margin-bottom: 14px; opacity: 0.9; height: 14px; line-height: 14px;
+  }
+  .h1 {
+    font-family: var(--font-display); font-size: 44px; font-weight: 800;
+    letter-spacing: -0.02em; line-height: 1.1; height: 48px; margin-bottom: 14px;
+    background: linear-gradient(90deg, var(--primary), var(--accent), var(--purple), var(--primary));
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: gradient-pan 10s linear infinite;
+  }
+  .subtitle { font-size: 15px; color: var(--secondary-text); opacity: 0.85; width: 560px; height: 24px; line-height: 1.6; }
+  .divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 14px; height: 14px; }
+  .divider-line { width: 120px; height: 1px; }
+  .divider-line.left { background: linear-gradient(90deg, transparent, var(--primary)); }
+  .divider-line.right { background: linear-gradient(90deg, var(--accent), transparent); }
+  .divider-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+  /* ============ CAPABILITY PANEL (pen: 1312 wide @ x:304 y:268) ============ */
+  .capability-panel {
+    position: relative; z-index: 10;
+    width: 1312px; margin: 54px 304px 0; padding: 28px;
+    border-radius: var(--radius-panel);
+    background: var(--panel-bg);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--panel-border);
+  }
+  .panel-deco-top {
+    position: absolute; top: 0; left: 28px; right: 28px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--primary) 15%, var(--accent) 85%, transparent);
+    opacity: 0.7; border-radius: 2px;
+  }
+  .translation-card {
+    border-radius: var(--radius-card); padding: 28px;
+    background: var(--glass-card);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-card-border);
+    border-top-color: var(--glass-card-border-top);
+    box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* ============ CONFIG BAR ============ */
+  .config-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .lang-pair { display: flex; align-items: center; gap: 10px; }
+  .dropdown {
+    position: relative;
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border-radius: var(--radius-button); background: var(--glass-card);
+    border: 1px solid var(--glass-card-border); cursor: pointer;
+    color: var(--body-text); font-size: 14px; font-weight: 600;
+    transition: all 0.2s; user-select: none;
+  }
+  .dropdown:hover { background: rgba(99,102,241,0.1); }
+  .dropdown.active { border-color: var(--accent); background: rgba(6,182,212,0.08); }
+  .dropdown .chevron { transition: transform 0.2s; }
+  .dropdown.open .chevron { transform: rotate(180deg); }
+  .swap-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--glass-card); border: 1px solid var(--glass-card-border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent); cursor: pointer; transition: all 0.3s;
+  }
+  .swap-btn:hover { transform: rotate(180deg); background: rgba(6,182,212,0.12); }
+
+  .dropdown-menu {
+    position: absolute; top: calc(100% + 8px); left: 0; min-width: 180px;
+    background: var(--canvas); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--glass-card-border); border-radius: var(--radius-button);
+    padding: 6px; z-index: 99999; box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+    display: none; max-height: 280px; overflow-y: auto;
+  }
+  .dark .dropdown-menu { background: #15151f; }
+  .light .dropdown-menu { background: #ffffff; }
+  .dropdown.open .dropdown-menu { display: block; }
+  .dropdown-item {
+    padding: 9px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 500; color: var(--body-text);
+    display: flex; align-items: center; gap: 8px; transition: all 0.15s;
+  }
+  .dropdown-item:hover { background: rgba(99,102,241,0.12); color: var(--primary); }
+  .dropdown-item.selected { background: rgba(6,182,212,0.12); color: var(--accent); }
+
+  .controls-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  /* Sensitive word button (opens CRUD dialog) */
+  .sensitive-btn {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    border-radius: var(--radius-button); background: var(--glass-card);
+    border: 1px solid var(--glass-card-border); cursor: pointer;
+    color: var(--body-text); font-size: 13px; font-weight: 600;
+    transition: all 0.2s; user-select: none; position: relative;
+  }
+  .sensitive-btn:hover { background: rgba(6,182,212,0.10); border-color: rgba(6,182,212,0.3); }
+  .sensitive-btn.on .sensitive-icon { color: var(--accent); }
+  .sensitive-btn.on .sensitive-label { color: var(--accent); }
+  .sensitive-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+  .sensitive-btn:not(.on) .sensitive-dot { display: none; }
+
+  .translate-btn {
+    display: flex; align-items: center; gap: 8px; width: 120px; height: 44px; padding: 12px 20px; justify-content: center;
+    border-radius: var(--radius-button); cursor: pointer; border: none;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: #fff; font-family: var(--font-body); font-size: 14px; font-weight: 700;
+    box-shadow: 0 8px 20px -4px rgba(99,102,241,0.5);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+  }
+  .translate-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 12px 24px -4px rgba(99,102,241,0.6); }
+  .translate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .translate-btn.loading .btn-label { display: none; }
+  .translate-btn.loading .btn-loading { display: flex; align-items: center; gap: 8px; }
+  .btn-loading { display: none; }
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============ TRANSLATION ZONES (pen: 1200×420, two 600-wide zones) ============ */
+  .zones { display: flex; width: 1200px; height: 420px; gap: 0; }
+  .zone { width: 600px; display: flex; flex-direction: column; gap: 12px; padding: 20px 20px 16px; min-width: 0; flex: none; }
+  .zone-head { display: flex; align-items: center; justify-content: space-between; }
+  .zone-title { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--secondary-text); }
+  .zone-title.accent { color: var(--accent); }
+  .status-pill { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 8px; background: rgba(6,182,212,0.08); font-size: 11px; font-weight: 600; color: var(--accent); }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .status-pill.error { background: rgba(239,68,68,0.08); color: var(--error); }
+  .status-pill.error .dot { background: var(--error); }
+  .clear-btn { background: none; border: none; color: var(--secondary-text); cursor: pointer; opacity: 0.6; padding: 4px; display: flex; }
+  .clear-btn:hover { opacity: 1; color: var(--error); }
+
+  .text-box {
+    flex: 1; padding: 18px; border-radius: 16px;
+    background: var(--input-box-bg); border: 1px solid var(--glass-card-border);
+    display: flex; flex-direction: column; justify-content: space-between;
+    transition: border-color 0.2s; position: relative;
+  }
+  .text-box.focused { border-color: rgba(6,182,212,0.4); }
+  .text-input, .text-output {
+    width: 100%; flex: 1; background: none; border: none; outline: none; resize: none;
+    font-family: var(--font-body); font-size: 16px; font-weight: 400; line-height: 1.6;
+    color: var(--body-text);
+  }
+  .text-input::placeholder { color: var(--secondary-text); opacity: 0.5; }
+  .text-output { white-space: pre-wrap; overflow-y: auto; }
+  .text-output.placeholder { color: var(--secondary-text); opacity: 0.5; }
+  .text-output .mask { color: var(--error); font-weight: 700; }
+
+  .zone-foot { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 12px; font-weight: 600; color: var(--secondary-text); }
+  .char-count.warn { color: var(--warning); }
+  .char-count.danger { color: var(--error); }
+  .foot-info { display: flex; align-items: center; gap: 6px; justify-content: flex-start; font-size: 11px; font-weight: 500; color: var(--secondary-text); opacity: 0.7; }
+
+  .result-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .tool-btn {
+    width: 34px; height: 34px; border-radius: 10px; background: var(--glass-card);
+    border: 1px solid var(--glass-card-border); display: flex; align-items: center; justify-content: center;
+    color: var(--secondary-text); cursor: pointer; transition: all 0.2s;
+  }
+  .tool-btn:hover { background: rgba(6,182,212,0.12); color: var(--accent); border-color: rgba(6,182,212,0.3); }
+  .tool-btn.speaking { color: var(--accent); border-color: rgba(6,182,212,0.4); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  .zone-divider { width: 1px; min-width: 1px; height: 420px; flex: none; background: var(--glass-card-border); }
+
+  /* ============ SENSITIVE WORD DIALOG (CRUD) ============ */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 9998;
+    background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.25s;
+  }
+  .modal-backdrop.show { display: flex; opacity: 1; }
+  .sensitive-dialog {
+    width: 800px; max-height: 720px; display: flex; flex-direction: column;
+    background: var(--glass-card);
+    backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-card-border);
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    overflow: hidden;
+    transform: translateY(12px) scale(0.98); transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .modal-backdrop.show .sensitive-dialog { transform: translateY(0) scale(1); }
+
+  .dialog-header {
+    height: 64px; flex: none; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; border-bottom: 1px solid var(--glass-card-border-top);
+  }
+  .dialog-title-block { display: flex; align-items: center; gap: 10px; }
+  .dialog-title-block svg { color: var(--accent); }
+  .dialog-title { font-size: 18px; font-weight: 600; color: var(--emphasis-text); }
+  .dialog-close {
+    width: 32px; height: 32px; border-radius: 8px; border: none; cursor: pointer;
+    background: var(--panel-bg); color: var(--secondary-text);
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .dialog-close:hover { background: rgba(239,68,68,0.12); color: var(--error); }
+
+  .dialog-search-row {
+    flex: none; display: flex; align-items: center; gap: 10px;
+    padding: 20px 24px 16px;
+  }
+  .dialog-search-field {
+    flex: 1; height: 40px; display: flex; align-items: center; gap: 8px;
+    padding: 0 12px; border-radius: 10px;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    color: var(--secondary-text);
+  }
+  .dialog-search-field input {
+    flex: 1; background: none; border: none; outline: none;
+    font-family: var(--font-body); font-size: 14px; color: var(--body-text);
+  }
+  .dialog-search-field input::placeholder { color: var(--secondary-text); opacity: 0.7; }
+  .dialog-add-btn {
+    width: 40px; height: 40px; flex: none; border-radius: 10px; border: none; cursor: pointer;
+    background: var(--accent); color: var(--on-primary);
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .dialog-add-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+  .word-list-wrap { flex: 1; padding: 0 24px; overflow-y: auto; min-height: 0; }
+  .word-list-header {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    font-size: 12px; font-weight: 500; color: var(--secondary-text);
+  }
+  .word-list-count { color: var(--accent); font-weight: 600; }
+  .word-row {
+    display: flex; align-items: center; gap: 12px; height: 44px;
+    padding: 0 12px; border-radius: 10px; margin-bottom: 8px;
+    border: 1px solid var(--panel-border); transition: all 0.15s;
+  }
+  .word-row:hover { background: rgba(6,182,212,0.06); border-color: rgba(6,182,212,0.2); }
+  .word-row svg.tag-icon { color: var(--accent); flex: none; }
+  .word-row .word-text { flex: 1; font-size: 14px; font-weight: 500; color: var(--body-text); }
+  .word-row .word-text-input {
+    flex: 1; background: var(--panel-bg); border: 1px solid var(--accent); border-radius: 6px;
+    padding: 4px 8px; font-family: var(--font-body); font-size: 14px; color: var(--body-text); outline: none;
+  }
+  .word-row .row-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+  .row-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .row-btn.edit { background: var(--panel-bg); color: var(--secondary-text); }
+  .row-btn.edit:hover { background: rgba(6,182,212,0.12); color: var(--accent); }
+  .row-btn.del { background: rgba(239,68,68,0.1); color: var(--error); }
+  .row-btn.del:hover { background: rgba(239,68,68,0.2); }
+  .row-btn.save { background: var(--accent); color: var(--on-primary); }
+  .word-list-empty { padding: 32px 0; text-align: center; color: var(--secondary-text); font-size: 13px; opacity: 0.7; }
+
+  .dialog-footer {
+    flex: none; display: flex; flex-direction: column; gap: 12px;
+    padding: 16px 24px 24px; border-top: 1px solid var(--glass-card-border-top);
+  }
+  .dialog-add-row {
+    height: 44px; display: flex; align-items: center; gap: 8px;
+    padding: 0 12px; border-radius: 10px;
+    background: var(--panel-bg); border: 1px solid var(--accent);
+  }
+  .dialog-add-row svg { color: var(--accent); flex: none; }
+  .dialog-add-row input {
+    flex: 1; background: none; border: none; outline: none;
+    font-family: var(--font-body); font-size: 14px; color: var(--body-text);
+  }
+  .dialog-add-row input::placeholder { color: var(--secondary-text); opacity: 0.7; }
+  .dialog-action-row { display: flex; align-items: center; gap: 12px; justify-content: flex-end; }
+  .dialog-btn {
+    width: 88px; height: 36px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: var(--font-body); font-size: 14px; font-weight: 600; transition: all 0.2s;
+  }
+  .dialog-btn.cancel { background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--body-text); }
+  .dialog-btn.cancel:hover { background: rgba(99,102,241,0.1); }
+  .dialog-btn.save { background: var(--accent); color: var(--on-primary); }
+  .dialog-btn.save:hover { filter: brightness(1.1); }
+
+  /* ============ ERROR BANNER ============ */
+  .error-banner {
+    display: none; align-items: center; gap: 8px; padding: 10px 14px;
+    border-radius: 12px; background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.25);
+    color: var(--error); font-size: 13px; font-weight: 600;
+  }
+  .error-banner.show { display: flex; animation: fadeIn 0.3s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ============ TOAST ============ */
+  .toast {
+    position: fixed; bottom: 32px; right: 32px; z-index: 99999;
+    display: flex; align-items: center; gap: 10px; padding: 12px 18px;
+    border-radius: 12px; background: var(--glass-card);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(34,197,94,0.25);
+    color: var(--body-text); font-size: 13px; font-weight: 700;
+    box-shadow: 0 12px 28px -6px rgba(0,0,0,0.4);
+    transform: translateY(80px); opacity: 0; transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-icon-circle { width: 22px; height: 22px; border-radius: 50%; background: var(--success); display: flex; align-items: center; justify-content: center; color: #0a0a0f; }
+  .light .toast-icon-circle { color: #fff; }
+
+  /* ============ HELPERS ============ */
+  .hidden { display: none !important; }
+  .demo-hint {
+    width: 1312px; margin: 20px 304px 48px; padding: 14px 20px;
+    border-radius: 12px; background: var(--glass-card); border: 1px solid var(--glass-card-border);
+    font-size: 12px; color: var(--secondary-text); line-height: 1.6;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .demo-hint b { color: var(--accent); }
+  kbd {
+    background: var(--glass-card); border: 1px solid var(--glass-card-border);
+    border-radius: 4px; padding: 1px 5px; font-size: 11px; font-family: monospace;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ ATMOSPHERIC BACKGROUND ============ -->
+<div class="bg-layer ambient-bg"></div>
+<div class="bg-layer mesh-blobs">
+  <div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>
+</div>
+<div class="bg-layer dot-grid"></div>
+<div class="bg-layer center-glow"></div>
+<div class="bg-layer stars" id="stars"></div>
+
+<div class="page">
+
+  <!-- ============ TOP NAV ============ -->
+  <nav class="glass-nav">
+    <div class="logo-group">
+      <div class="logo-mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+      </div>
+      <div class="wordmark"><span class="gradient">AI</span> Hub</div>
+    </div>
+    <div class="nav-right">
+      <button class="icon-btn" id="themeBtn" title="切换主题" aria-label="切换主题">
+        <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <button class="lang-btn" id="uiLangBtn" aria-haspopup="true">
+        <span id="uiLangLabel">中文</span>
+        <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="avatar">Y</div>
+    </div>
+  </nav>
+
+  <!-- ============ PAGE HEADER ============ -->
+  <header class="page-header">
+    <h1 class="h1">机器翻译</h1>
+    <p class="subtitle" id="subtitle">神经网络多语言互译 · 支持专业领域术语与敏感词风控</p>
+    <div class="divider">
+      <div class="divider-line left"></div>
+      <div class="divider-dot"></div>
+      <div class="divider-line right"></div>
+    </div>
+  </header>
+
+  <!-- ============ CAPABILITY PANEL ============ -->
+  <main class="capability-panel">
+    <div class="panel-deco-top"></div>
+    <div class="translation-card">
+
+      <!-- CONFIG BAR -->
+      <div class="config-bar">
+        <div class="lang-pair">
+          <!-- Source language -->
+          <div class="dropdown" id="srcLang" data-field="srcLang">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>
+            <span class="dropdown-label" id="srcLangLabel">自动检测</span>
+            <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <div class="dropdown-menu" id="srcLangMenu"></div>
+          </div>
+
+          <button class="swap-btn" id="swapBtn" title="交换语言" aria-label="交换语言">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+          </button>
+
+          <!-- Target language -->
+          <div class="dropdown active" id="tgtLang" data-field="tgtLang">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+            <span class="dropdown-label" id="tgtLangLabel">English</span>
+            <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <div class="dropdown-menu" id="tgtLangMenu"></div>
+          </div>
+        </div>
+
+        <div class="controls-right">
+          <!-- Domain select -->
+          <div class="dropdown" id="domain" data-field="domain">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V7"/><path d="M8 21V7"/></svg>
+            <span class="dropdown-label" id="domainLabel">通用</span>
+            <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <div class="dropdown-menu" id="domainMenu"></div>
+          </div>
+
+          <!-- Sensitive word button (opens CRUD dialog) -->
+          <button class="sensitive-btn on" id="sensitiveBtn" title="管理敏感词" aria-label="管理敏感词">
+            <svg class="sensitive-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span class="sensitive-label">敏感词</span>
+            <span class="sensitive-dot"></span>
+          </button>
+
+          <!-- Translate button -->
+          <button class="translate-btn" id="translateBtn">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+            <span class="btn-label">立即翻译</span>
+            <span class="btn-loading"><span class="spinner"></span>翻译中…</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ERROR BANNER -->
+      <div class="error-banner" id="errorBanner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span id="errorBannerText">文本包含敏感内容，已拦截，请修改后重试。</span>
+      </div>
+
+      <!-- TRANSLATION ZONES -->
+      <div class="zones">
+        <!-- INPUT -->
+        <div class="zone">
+          <div class="zone-head">
+            <span class="zone-title">原文</span>
+            <button class="clear-btn" id="clearBtn" title="清空" aria-label="清空">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+            </button>
+          </div>
+          <div class="text-box" id="inputBox">
+            <textarea class="text-input" id="inputText" placeholder="请输入要翻译的单词或句子" maxlength="2000"></textarea>
+            <div class="zone-foot">
+              <span class="char-count" id="charCount">0 / 2000</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="zone-divider"></div>
+
+        <!-- RESULT -->
+        <div class="zone">
+          <div class="zone-head">
+            <span class="zone-title accent" id="resultTitle">译文 · English</span>
+            <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusText">已就绪</span></div>
+          </div>
+          <div class="text-box" id="resultBox">
+            <div class="text-output placeholder" id="resultText">翻译结果将显示在这里\n点击「立即翻译」开始</div>
+            <div class="result-toolbar">
+              <button class="tool-btn" id="speakBtn" title="朗读译文" aria-label="朗读译文">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.7A4.7 4.7 0 0 1 15.7 0H21v16h-5.3a4.7 4.7 0 0 0-4.7 4.7V23a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9a4.7 4.7 0 0 1 5-4.7Z"/></svg>
+              </button>
+              <button class="tool-btn" id="copyBtn" title="复制译文" aria-label="复制译文">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="foot-info">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            <span id="footInfo">领域：通用 · 敏感词过滤已开启</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- DEMO HINT -->
+  <div class="demo-hint">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; margin-top:1px; color: var(--accent);"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <span>
+      <b>演示提示：</b>试试输入“这份合同需要立即处理”并点「立即翻译」；输入含敏感词如“违规广告”可触发拦截；点右上角月亮切换深浅色；点中间互换图标交换语言；点「敏感词」按钮打开管理弹窗，可增删改查敏感词。复制译文时会自动过滤脱敏符号 <kbd>***</kbd>。
+    </span>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-icon-circle">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+  </div>
+  <span id="toastText">复制成功</span>
+</div>
+
+<!-- ============ SENSITIVE WORD DIALOG (CRUD) ============ -->
+<div class="modal-backdrop" id="sensitiveModal">
+  <div class="sensitive-dialog" role="dialog" aria-modal="true" aria-label="敏感词管理">
+    <!-- Header -->
+    <div class="dialog-header">
+      <div class="dialog-title-block">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span class="dialog-title">敏感词管理</span>
+      </div>
+      <button class="dialog-close" id="dialogClose" aria-label="关闭">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Search row (query) -->
+    <div class="dialog-search-row">
+      <div class="dialog-search-field">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="sensitiveSearch" placeholder="搜索敏感词…" />
+      </div>
+      <button class="dialog-add-btn" id="quickAddBtn" title="快速添加" aria-label="快速添加">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      </button>
+    </div>
+
+    <!-- Word list -->
+    <div class="word-list-wrap">
+      <div class="word-list-header">
+        <span>已配置敏感词</span>
+        <span class="word-list-count" id="wordCount">0</span>
+      </div>
+      <div id="wordList"></div>
+    </div>
+
+    <!-- Footer (add new + actions) -->
+    <div class="dialog-footer">
+      <div class="dialog-add-row">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+        <input type="text" id="newWordInput" placeholder="输入新敏感词，回车添加" maxlength="30" />
+      </div>
+      <div class="dialog-action-row">
+        <button class="dialog-btn cancel" id="dialogCancel">取消</button>
+        <button class="dialog-btn save" id="dialogSave">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   AI Hub · 机器翻译 — 演示交互逻辑
+   对应 PRD §3 功能详细说明 & §5.2 前端交互逻辑
+   ============================================================ */
+
+// ---------- 语言与领域数据 ----------
+const LANGS = [
+  { code: "auto",   zh: "自动检测", en: "Auto Detect" },
+  { code: "zh",     zh: "中文",     en: "Chinese" },
+  { code: "en",     zh: "英语",     en: "English" },
+  { code: "ja",     zh: "日语",     en: "Japanese" },
+  { code: "ko",     zh: "韩语",     en: "Korean" },
+  { code: "fr",     zh: "法语",     en: "French" },
+  { code: "de",     zh: "德语",     en: "German" },
+  { code: "es",     zh: "西班牙语", en: "Spanish" },
+  { code: "ru",     zh: "俄语",     en: "Russian" },
+  { code: "ar",     zh: "阿拉伯语", en: "Arabic" },
+  { code: "pt",     zh: "葡萄牙语", en: "Portuguese" },
+  { code: "it",     zh: "意大利语", en: "Italian" },
+];
+
+const DOMAINS = [
+  { code: "general",  zh: "通用" },
+  { code: "it",       zh: "信息技术" },
+  { code: "bio",      zh: "生物医药" },
+  { code: "finance",  zh: "金融财经" },
+  { code: "legal",    zh: "法律合同" },
+];
+
+// 敏感词库（演示用，对应 PRD §5.1.1 一级高危）— 可在弹窗中增删改查
+let SENSITIVE_WORDS = ["违规广告", "涉政内容", "暴恐信息", "色情内容", "侵权词", "恶意引流"];
+
+// 领域术语库（演示用，对应 PRD §5.1.2）
+const TERM_BANKS = {
+  it:      { "API": "Application Programming Interface", "算法": "algorithm", "接口": "API endpoint", "缓存": "cache" },
+  bio:     { "基因": "gene", "疫苗": "vaccine", "抗体": "antibody", "临床试验": "clinical trial" },
+  finance: { "对冲": "hedging", "市值": "market cap", "结算": "settlement", "收益率": "yield" },
+  legal:   { "合同": "contract", "条款": "clause", "违约": "breach", "仲裁": "arbitration" },
+  general: {},
+};
+
+// 简易翻译字典（演示用，真实场景调用后端翻译引擎）
+const DICT = {
+  "这份合同需要立即处理": "This contract requires immediate processing.",
+  "这份合同涉及敏感内容需要立即处理": "This contract involves sensitive content and requires immediate processing.",
+  "你好世界": "Hello World",
+  "机器翻译是AI工具箱的核心工具": "Machine translation is a core tool of the AI toolkit.",
+  "请输入要翻译的单词或句子": "Please enter a word or sentence to translate.",
+  "今天天气很好": "The weather is nice today.",
+  "谢谢": "Thank you.",
+  "我爱你": "I love you.",
+};
+
+// ---------- 状态 ----------
+const state = {
+  srcLang: "auto",
+  tgtLang: "en",
+  domain: "general",
+  sensitive: true,
+  uiLang: "zh",
+  isTranslating: false,
+  lastResult: "",
+  hasResult: false,
+};
+
+// ---------- 工具 ----------
+const $ = (id) => document.getElementById(id);
+const langByCode = (c) => LANGS.find(l => l.code === c);
+const langLabel = (c) => { const l = langByCode(c); return state.uiLang === "zh" ? l.zh : l.en; };
+const domainLabel = (c) => DOMAINS.find(d => d.code === c).zh;
+
+function escapeHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ---------- 渲染下拉菜单 ----------
+function buildLangMenu(menuEl, field, includeAuto) {
+  menuEl.innerHTML = "";
+  LANGS.filter(l => includeAuto || l.code !== "auto").forEach(l => {
+    const item = document.createElement("div");
+    item.className = "dropdown-item" + (state[field] === l.code ? " selected" : "");
+    item.innerHTML = `<span>${state.uiLang === "zh" ? l.zh : l.en}</span>`;
+    item.onclick = (e) => {
+      e.stopPropagation();
+      state[field] = l.code;
+      $(field + "Label").textContent = state.uiLang === "zh" ? l.zh : l.en;
+      closeAllDropdowns();
+      if (field === "tgtLang") updateResultTitle();
+    };
+    menuEl.appendChild(item);
+  });
+}
+
+function buildDomainMenu() {
+  const menu = $("domainMenu");
+  menu.innerHTML = "";
+  DOMAINS.forEach(d => {
+    const item = document.createElement("div");
+    item.className = "dropdown-item" + (state.domain === d.code ? " selected" : "");
+    item.innerHTML = `<span>${d.zh}</span>`;
+    item.onclick = (e) => {
+      e.stopPropagation();
+      state.domain = d.code;
+      $("domainLabel").textContent = d.zh;
+      closeAllDropdowns();
+      updateFootInfo();
+      if (state.hasResult) doTranslate(); // 切换领域重新翻译以应用术语库
+    };
+    menu.appendChild(item);
+  });
+}
+
+// ---------- 下拉开关 ----------
+function setupDropdown(id, field, includeAuto) {
+  const el = $(id);
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const wasOpen = el.classList.contains("open");
+    closeAllDropdowns();
+    if (!wasOpen) {
+      el.classList.add("open");
+      buildLangMenu($(id + "Menu"), field, includeAuto);
+    }
+  });
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll(".dropdown.open").forEach(d => d.classList.remove("open"));
+}
+document.addEventListener("click", closeAllDropdowns);
+
+// ---------- 主题切换 ----------
+$("themeBtn").addEventListener("click", () => {
+  const html = document.documentElement;
+  html.classList.add("theme-transitioning");
+  const isDark = html.classList.contains("dark");
+  html.classList.toggle("dark", !isDark);
+  html.classList.toggle("light", isDark);
+  $("themeIcon").innerHTML = isDark
+    ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'
+    : '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+  setTimeout(() => html.classList.remove("theme-transitioning"), 450);
+});
+
+// ---------- UI 语言切换 ----------
+$("uiLangBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  state.uiLang = state.uiLang === "zh" ? "en" : "zh";
+  $("uiLangLabel").textContent = state.uiLang === "zh" ? "中文" : "EN";
+  // 更新所有标签
+  $("srcLangLabel").textContent = langLabel(state.srcLang);
+  $("tgtLangLabel").textContent = langLabel(state.tgtLang);
+  $("domainLabel").textContent = state.uiLang === "zh" ? domainLabel(state.domain) : state.domain;
+  $("subtitle").textContent = state.uiLang === "zh"
+    ? "神经网络多语言互译 · 支持专业领域术语与敏感词风控"
+    : "Neural multilingual translation · domain terminology & sensitive-word filtering";
+  updateResultTitle();
+  updateFootInfo();
+});
+
+// ---------- 语言互换 ----------
+$("swapBtn").addEventListener("click", () => {
+  // 自动检测不能作为目标语言，互换时若源是 auto，取一个默认值
+  const s = state.srcLang === "auto" ? "zh" : state.srcLang;
+  const t = state.tgtLang;
+  state.srcLang = t;
+  state.tgtLang = s;
+  $("srcLangLabel").textContent = langLabel(state.srcLang);
+  $("tgtLangLabel").textContent = langLabel(state.tgtLang);
+  updateResultTitle();
+});
+
+// ---------- 敏感词按钮 → 打开 CRUD 弹窗 ----------
+const sensitiveModal = $("sensitiveModal");
+function openSensitiveDialog() {
+  renderWordList();
+  $("sensitiveSearch").value = "";
+  sensitiveModal.classList.add("show");
+  setTimeout(() => $("newWordInput").focus(), 100);
+}
+function closeSensitiveDialog() {
+  sensitiveModal.classList.remove("show");
+  cancelAllEdits();
+}
+$("sensitiveBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  openSensitiveDialog();
+});
+$("dialogClose").addEventListener("click", closeSensitiveDialog);
+$("dialogCancel").addEventListener("click", closeSensitiveDialog);
+sensitiveModal.addEventListener("click", (e) => {
+  if (e.target === sensitiveModal) closeSensitiveDialog();
+});
+
+// ---------- 敏感词 CRUD ----------
+const wordListEl = $("wordList");
+const wordCountEl = $("wordCount");
+const newWordInput = $("newWordInput");
+const searchInput = $("sensitiveSearch");
+let editingId = null; // 当前正在编辑的词索引
+
+function escapeAttr(s) { return s.replace(/"/g, "&quot;"); }
+
+function renderWordList() {
+  const q = searchInput.value.trim().toLowerCase();
+  const list = SENSITIVE_WORDS
+    .map((w, i) => ({ w, i }))
+    .filter(item => !q || item.w.toLowerCase().includes(q));
+  wordCountEl.textContent = SENSITIVE_WORDS.length;
+  if (list.length === 0) {
+    wordListEl.innerHTML = `<div class="word-list-empty">${q ? "未找到匹配的敏感词" : "暂无敏感词，在下方添加"}</div>`;
+    return;
+  }
+  wordListEl.innerHTML = list.map(({ w, i }) => {
+    if (editingId === i) {
+      return `
+        <div class="word-row" data-id="${i}">
+          <svg class="tag-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+          <input type="text" class="word-text-input" id="editInput-${i}" value="${escapeAttr(w)}" maxlength="30" />
+          <div class="row-actions">
+            <button class="row-btn save" data-action="save" data-id="${i}" title="保存">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+            <button class="row-btn edit" data-action="cancel" data-id="${i}" title="取消">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="word-row" data-id="${i}">
+        <svg class="tag-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+        <span class="word-text">${escapeHtml(w)}</span>
+        <div class="row-actions">
+          <button class="row-btn edit" data-action="edit" data-id="${i}" title="编辑">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a2.27 2.27 0 0 0-.68-2.12 2.27 2.27 0 0 0-2.12-.68L3 19.99V21h1.01z"/><path d="m15 5 4 4"/></svg>
+          </button>
+          <button class="row-btn del" data-action="delete" data-id="${i}" title="删除">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function cancelAllEdits() {
+  editingId = null;
+}
+
+// 行操作事件委托（编辑/删除/保存/取消）
+wordListEl.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const id = parseInt(btn.dataset.id, 10);
+  if (action === "edit") {
+    editingId = id;
+    renderWordList();
+    setTimeout(() => { const inp = $("editInput-" + id); if (inp) { inp.focus(); inp.select(); } }, 0);
+  } else if (action === "cancel") {
+    editingId = null;
+    renderWordList();
+  } else if (action === "save") {
+    const inp = $("editInput-" + id);
+    if (!inp) return;
+    const val = inp.value.trim();
+    if (!val) { showToast("敏感词不能为空"); return; }
+    if (SENSITIVE_WORDS.some((w, j) => w === val && j !== id)) { showToast("该敏感词已存在"); return; }
+    SENSITIVE_WORDS[id] = val;
+    editingId = null;
+    renderWordList();
+    showToast("已更新");
+  } else if (action === "delete") {
+    SENSITIVE_WORDS.splice(id, 1);
+    editingId = null;
+    renderWordList();
+    showToast("已删除");
+    updateSensitiveBtnState();
+  }
+});
+
+// 编辑输入框回车保存 / Esc 取消
+wordListEl.addEventListener("keydown", (e) => {
+  if (e.target.classList.contains("word-text-input")) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const id = parseInt(e.target.id.replace("editInput-", ""), 10);
+      const val = e.target.value.trim();
+      if (!val) { showToast("敏感词不能为空"); return; }
+      if (SENSITIVE_WORDS.some((w, j) => w === val && j !== id)) { showToast("该敏感词已存在"); return; }
+      SENSITIVE_WORDS[id] = val;
+      editingId = null;
+      renderWordList();
+      showToast("已更新");
+    } else if (e.key === "Escape") {
+      editingId = null;
+      renderWordList();
+    }
+  }
+});
+
+// 添加新敏感词
+function addNewWord() {
+  const val = newWordInput.value.trim();
+  if (!val) { showToast("请输入敏感词"); return; }
+  if (SENSITIVE_WORDS.includes(val)) { showToast("该敏感词已存在"); return; }
+  SENSITIVE_WORDS.push(val);
+  newWordInput.value = "";
+  renderWordList();
+  showToast("已添加");
+  updateSensitiveBtnState();
+}
+newWordInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); addNewWord(); }
+});
+$("quickAddBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  // 聚焦到底部添加输入框
+  newWordInput.focus();
+});
+$("dialogSave").addEventListener("click", () => {
+  // 若有正在编辑的项，先保存
+  if (editingId !== null) {
+    const inp = $("editInput-" + editingId);
+    if (inp) {
+      const val = inp.value.trim();
+      if (val && !SENSITIVE_WORDS.some((w, j) => w === val && j !== editingId)) {
+        SENSITIVE_WORDS[editingId] = val;
+      }
+    }
+    editingId = null;
+  }
+  closeSensitiveDialog();
+  updateFootInfo();
+  if (state.hasResult) doTranslate();
+});
+
+// 搜索（query）
+searchInput.addEventListener("input", () => { editingId = null; renderWordList(); });
+
+// 更新敏感词按钮状态：有词则亮起（过滤开启），无词则关闭
+function updateSensitiveBtnState() {
+  const active = SENSITIVE_WORDS.length > 0;
+  state.sensitive = active;
+  $("sensitiveBtn").classList.toggle("on", active);
+  updateFootInfo();
+}
+
+// ---------- 输入与字数 ----------
+const inputEl = $("inputText");
+const charCountEl = $("charCount");
+inputEl.addEventListener("input", () => {
+  const len = inputEl.value.length;
+  charCountEl.textContent = `${len} / 2000`;
+  charCountEl.classList.toggle("warn", len > 1800 && len < 2000);
+  charCountEl.classList.toggle("danger", len >= 2000);
+  // 输入时清除错误态
+  hideError();
+});
+inputEl.addEventListener("focus", () => $("inputBox").classList.add("focused"));
+inputEl.addEventListener("blur", () => $("inputBox").classList.remove("focused"));
+inputEl.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); doTranslate(); }
+});
+
+// 清空
+$("clearBtn").addEventListener("click", () => {
+  inputEl.value = "";
+  charCountEl.textContent = "0 / 2000";
+  charCountEl.classList.remove("warn", "danger");
+  setResult("", true);
+  hideError();
+  inputEl.focus();
+});
+
+// ---------- 前置风控（PRD §5.1.1） ----------
+function preRiskControl(text) {
+  const hits = SENSITIVE_WORDS.filter(w => text.includes(w));
+  if (hits.length === 0) return { level: "safe", hits: [] };
+  // 演示：所有命中均视为一级高危拦截
+  return { level: "high", hits };
+}
+
+// ---------- 模拟翻译引擎（PRD §5.1.2-5.1.4） ----------
+function mockTranslate(text) {
+  // 1. 术语约束：查找领域术语库，替换为标准译法
+  const terms = TERM_BANKS[state.domain] || {};
+  // 2. 基础翻译：字典查找或简单占位
+  let result = DICT[text] || DICT[text.trim()] || "";
+  if (!result) {
+    // 无匹配时给出演示性翻译
+    if (/^[a-zA-Z\s,.!?]+$/.test(text)) {
+      result = "（中→英演示）" + text.split("").reverse().join(""); // 演示占位
+    } else {
+      result = "（演示译文）" + text;
+    }
+  }
+  // 3. 术语强制校验：若文本包含术语库中的词，确保译文中出现标准译法
+  for (const [src, std] of Object.entries(terms)) {
+    if (text.includes(src) && !result.includes(std)) {
+      result += ` [${src} → ${std}]`;
+    }
+  }
+  return result;
+}
+
+// ---------- 翻译主流程 ----------
+function doTranslate() {
+  if (state.isTranslating) return;
+  const text = inputEl.value.trim();
+  hideError();
+
+  // 空内容提交（PRD §4.2）
+  if (!text) {
+    showError(state.uiLang === "zh" ? "请输入要翻译的内容。" : "Please enter content to translate.");
+    setStatus("empty");
+    return;
+  }
+  // 超长文本（PRD §4.3）—— maxlength 已限制，这里再兜底
+  if (text.length > 2000) {
+    showError(state.uiLang === "zh" ? "文本过长，请拆分后重试。" : "Text too long, please split and retry.");
+    return;
+  }
+
+  // 前置风控
+  if (state.sensitive) {
+    const risk = preRiskControl(text);
+    if (risk.level === "high") {
+      // 一级高危：拦截（PRD §5.2 翻译触发阶段）
+      const masked = risk.hits.map(w => `<span class="mask">***</span>`).join(" ");
+      showError((state.uiLang === "zh" ? "文本包含敏感内容，已拦截，请修改后重试。" : "Blocked: sensitive content detected. ") + ` ${masked}`);
+      setStatus("error");
+      setResult("", true);
+      return;
+    }
+  }
+
+  // 翻译执行
+  state.isTranslating = true;
+  $("translateBtn").classList.add("loading");
+  $("translateBtn").disabled = true;
+  setStatus("loading");
+
+  // 模拟网络延迟 + 翻译
+  setTimeout(() => {
+    const translated = mockTranslate(text);
+    // 后置风控（演示：译文本身无风险）
+    setResult(translated, false);
+    state.lastResult = translated;
+    state.hasResult = true;
+    setStatus("done");
+    state.isTranslating = false;
+    $("translateBtn").classList.remove("loading");
+    $("translateBtn").disabled = false;
+  }, 700);
+}
+
+$("translateBtn").addEventListener("click", () => doTranslate());
+
+// ---------- 结果区 ----------
+function setResult(text, isPlaceholder) {
+  const el = $("resultText");
+  if (isPlaceholder || !text) {
+    el.className = "text-output placeholder";
+    el.textContent = state.uiLang === "zh" ? "翻译结果将显示在这里\n点击「立即翻译」开始" : "Result appears here\nClick Translate to start";
+    state.hasResult = false;
+  } else {
+    el.className = "text-output";
+    el.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+  }
+}
+
+function setStatus(s) {
+  const pill = $("statusPill");
+  const txt = $("statusText");
+  pill.classList.remove("error");
+  const labels = {
+    ready:  state.uiLang === "zh" ? "已就绪" : "Ready",
+    loading: state.uiLang === "zh" ? "翻译中" : "Translating",
+    done:   state.uiLang === "zh" ? "已完成" : "Done",
+    error:  state.uiLang === "zh" ? "已拦截" : "Blocked",
+    empty:  state.uiLang === "zh" ? "请输入内容" : "Empty",
+  };
+  txt.textContent = labels[s] || s;
+  if (s === "error" || s === "empty") pill.classList.add("error");
+  if (s === "loading") $("statusPill").querySelector(".dot").style.background = "var(--warning)";
+  else $("statusPill").querySelector(".dot").style.background = s === "error" || s === "empty" ? "var(--error)" : "var(--success)";
+}
+
+function showError(msg) {
+  $("errorBannerText").textContent = msg.replace(/<[^>]+>/g, "");
+  // 保留 mask 高亮
+  const maskMatch = msg.match(/(\*\*\*[^\*]*\*\*\*|安全提示.*)/);
+  $("errorBanner").classList.add("show");
+}
+function hideError() { $("errorBanner").classList.remove("show"); }
+
+function updateResultTitle() {
+  $("resultTitle").textContent = (state.uiLang === "zh" ? "译文 · " : "Result · ") + langLabel(state.tgtLang);
+}
+function updateFootInfo() {
+  const parts = [
+    (state.uiLang === "zh" ? "领域：" : "Domain: ") + domainLabel(state.domain),
+    state.sensitive ? (state.uiLang === "zh" ? "敏感词过滤已开启" : "Sensitive filter on") : (state.uiLang === "zh" ? "敏感词过滤已关闭" : "Sensitive filter off"),
+  ];
+  $("footInfo").textContent = parts.join(" · ");
+}
+
+// ---------- 朗读（TTS，PRD §3.4） ----------
+let speaking = false;
+$("speakBtn").addEventListener("click", () => {
+  if (!state.hasResult || !state.lastResult) return;
+  if (speaking) {
+    speechSynthesis.cancel();
+    speaking = false;
+    $("speakBtn").classList.remove("speaking");
+    return;
+  }
+  if (!("speechSynthesis" in window)) {
+    showToast(state.uiLang === "zh" ? "浏览器不支持语音朗读" : "TTS not supported");
+    return;
+  }
+  const u = new SpeechSynthesisUtterance(state.lastResult);
+  u.lang = state.tgtLang === "zh" ? "zh-CN" : "en-US";
+  u.onend = () => { speaking = false; $("speakBtn").classList.remove("speaking"); };
+  u.onerror = () => { speaking = false; $("speakBtn").classList.remove("speaking"); };
+  speechSynthesis.speak(u);
+  speaking = true;
+  $("speakBtn").classList.add("speaking");
+});
+
+// ---------- 复制（PRD §3.4 & §5.2 复制时自动过滤脱敏符号） ----------
+$("copyBtn").addEventListener("click", async () => {
+  if (!state.hasResult || !state.lastResult) return;
+  // 自动过滤脱敏符号 ***
+  const clean = state.lastResult.replace(/\*\*\*/g, "").replace(/\s{2,}/g, " ").trim();
+  try {
+    await navigator.clipboard.writeText(clean);
+    showToast(state.uiLang === "zh" ? "复制成功" : "Copied");
+  } catch {
+    // 兜底
+    const ta = document.createElement("textarea");
+    ta.value = clean; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); showToast(state.uiLang === "zh" ? "复制成功" : "Copied"); }
+    catch { showToast(state.uiLang === "zh" ? "复制失败" : "Copy failed"); }
+    document.body.removeChild(ta);
+  }
+});
+
+// ---------- Toast ----------
+let toastTimer = null;
+function showToast(msg) {
+  $("toastText").textContent = msg;
+  $("toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 2200);
+}
+
+// ---------- 星点生成 ----------
+(function makeStars() {
+  const c = $("stars");
+  const pos = [[180,90],[320,140],[1120,70],[1280,160],[1380,300],[60,420],[90,760],[1360,820],[1180,900],[240,950],[480,200],[760,120],[980,260],[640,880]];
+  pos.forEach(([x,y], i) => {
+    const s = document.createElement("div");
+    s.className = "star";
+    s.style.left = x + "px"; s.style.top = y + "px";
+    s.style.animationDelay = (i % 4) * 0.8 + "s";
+    c.appendChild(s);
+  });
+})();
+
+// ---------- 初始化 ----------
+setupDropdown("srcLang", "srcLang", true);
+setupDropdown("tgtLang", "tgtLang", false);
+buildDomainMenu();
+$("domain").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const wasOpen = $("domain").classList.contains("open");
+  closeAllDropdowns();
+  if (!wasOpen) { $("domain").classList.add("open"); buildDomainMenu(); }
+});
+updateResultTitle();
+updateFootInfo();
+updateSensitiveBtnState();
+setStatus("ready");
+</script>
+</body>
+</html>
