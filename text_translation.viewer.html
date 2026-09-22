@@ -36,15 +36,23 @@
     mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
   }
   // 初始化 marked:把 ```mermaid 代码块输出为 <div class="mermaid">,供 Mermaid 渲染
-  // 注意 marked v12+ 的 code renderer 签名为 code({ text, lang, escaped }),
-  // 且必须用 marked.use() 注册(setOptions 在 v12+ 对 renderer 覆盖不可靠)。
+  // marked v12 的 code renderer 签名经历过变更:位置参数 code(text, lang, escaped)
+  // 或对象 {text, lang}。用 arguments 探测兼容两种。
+  // 必须用 marked.use() 注册(setOptions 对 renderer 覆盖不可靠)。
   // 返回 false 让 marked 走默认 code renderer 处理非 mermaid 代码块。
   if (typeof marked !== "undefined") {
     marked.use({
       renderer: {
-        code: function (_ref) {
-          var lang = (_ref && _ref.lang) || "";
-          var text = (_ref && _ref.text) || "";
+        code: function () {
+          var text, lang;
+          var a0 = arguments[0];
+          if (a0 && typeof a0 === "object") {
+            text = a0.text || "";
+            lang = a0.lang || "";
+          } else {
+            text = String(a0 || "");
+            lang = String(arguments[1] || "");
+          }
           if (lang === "mermaid") {
             return '<div class="mermaid">' + text + '</div>';
           }
