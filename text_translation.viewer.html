@@ -155,13 +155,17 @@
     }
     try {
       // 自定义渲染器:把 ```mermaid 代码块输出为 <div class="mermaid">,供 Mermaid 渲染
+      // 注意:marked v12+ 的 code renderer 签名为 code({ text, lang, escaped })
       var renderer = new marked.Renderer();
       var origCode = renderer.code.bind(renderer);
-      renderer.code = function (code, infostring) {
-        if (infostring === "mermaid") {
-          return '<div class="mermaid">' + escapeHtml(code) + '</div>';
+      renderer.code = function (token) {
+        var lang = (token && token.lang) || "";
+        var text = (token && token.text) || "";
+        if (lang === "mermaid") {
+          // mermaid 需要原始图源文本,不要 HTML 转义
+          return '<div class="mermaid">' + text + '</div>';
         }
-        return origCode(code, infostring);
+        return origCode(token);
       };
       marked.setOptions({ renderer: renderer });
       specView.innerHTML = marked.parse(md);
