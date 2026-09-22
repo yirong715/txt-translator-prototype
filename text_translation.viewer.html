@@ -35,6 +35,24 @@
   if (typeof mermaid !== "undefined") {
     mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
   }
+  // 初始化 marked:把 ```mermaid 代码块输出为 <div class="mermaid">,供 Mermaid 渲染
+  // 注意 marked v12+ 的 code renderer 签名为 code({ text, lang, escaped }),
+  // 且必须用 marked.use() 注册(setOptions 在 v12+ 对 renderer 覆盖不可靠)。
+  // 返回 false 让 marked 走默认 code renderer 处理非 mermaid 代码块。
+  if (typeof marked !== "undefined") {
+    marked.use({
+      renderer: {
+        code: function (_ref) {
+          var lang = (_ref && _ref.lang) || "";
+          var text = (_ref && _ref.text) || "";
+          if (lang === "mermaid") {
+            return '<div class="mermaid">' + text + '</div>';
+          }
+          return false;
+        }
+      }
+    });
+  }
 </script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -154,20 +172,7 @@
       return;
     }
     try {
-      // 自定义渲染器:把 ```mermaid 代码块输出为 <div class="mermaid">,供 Mermaid 渲染
-      // 注意:marked v12+ 的 code renderer 签名为 code({ text, lang, escaped })
-      var renderer = new marked.Renderer();
-      var origCode = renderer.code.bind(renderer);
-      renderer.code = function (token) {
-        var lang = (token && token.lang) || "";
-        var text = (token && token.text) || "";
-        if (lang === "mermaid") {
-          // mermaid 需要原始图源文本,不要 HTML 转义
-          return '<div class="mermaid">' + text + '</div>';
-        }
-        return origCode(token);
-      };
-      marked.setOptions({ renderer: renderer });
+      // mermaid 代码块的 renderer 已在初始化时通过 marked.use 注册,这里直接解析
       specView.innerHTML = marked.parse(md);
       // 解析后渲染 Mermaid 图
       if (typeof mermaid !== "undefined") {
