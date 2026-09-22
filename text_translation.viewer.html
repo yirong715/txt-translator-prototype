@@ -14,11 +14,21 @@
 -->
 <script>
   // ===== 生成时注入的参数 =====
-  const SPEC_PATH = "/txt_trastor/text_translation.md";
-  const PROTOTYPE_PATH = "/txt_trastor/text_translation.html";
-  const SAVE_ENDPOINT = "/save";
+  // 注意:路径以仓库根为基准(不带 /txt_trastor/ 前缀),同时兼容
+  //   本地 spec_server (root = 项目根, 仓库内容位于 /txt_trastor/)
+  //   GitHub Pages  (仓库根即站点根)
+  // 运行环境检测:有后端 /save 才启用编辑保存,否则只读。
+  var STATIC_HOST = (location.protocol === "file:") ||
+    !/localhost|127\.0\.0\.1/.test(location.hostname);
+  var SPEC_PATH = STATIC_HOST
+    ? "text_translation.md"
+    : "/txt_trastor/text_translation.md";
+  var PROTOTYPE_PATH = STATIC_HOST
+    ? "text_translation.html"
+    : "/txt_trastor/text_translation.html";
+  var SAVE_ENDPOINT = "/save";
 </script>
-<script src="/vendor/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <script>
   // 初始化 Mermaid 渲染器
@@ -199,6 +209,10 @@
   }
 
   function saveSpec() {
+    if (STATIC_HOST) {
+      setStatus("线上预览不支持保存,请本地运行 spec_server 后编辑", "error");
+      return;
+    }
     var content = editor.value;
     setStatus("保存中(写入前备份旧版)…", "saving");
     fetch(SAVE_ENDPOINT, {
